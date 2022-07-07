@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/adrianosela/rbac/api/model"
+	"github.com/adrianosela/rbac/utils/set"
 	"github.com/gorilla/mux"
 )
 
@@ -25,6 +26,8 @@ func (s *service) createPermissionHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 	// TODO: add authenticated user to owners if not present
+	user := "MOCK_AUTHENTICATED_USER"
+	permission.Owners = set.NewSet(permission.Owners...).Add(user).Slice()
 	// TODO: validate role has mandatory fields populated
 	if err := s.store.CreatePermission(permission); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
