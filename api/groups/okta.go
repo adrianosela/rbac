@@ -46,6 +46,9 @@ func (os *OktaSource) GetForUser(id string) ([]string, error) {
 		return nil, fmt.Errorf("Failed to make http request: %s", err)
 	}
 
+	if resp.StatusCode == http.StatusNotFound {
+		return []string{}, nil
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Got a non 200 HTTP status code: %d", resp.StatusCode)
 	}

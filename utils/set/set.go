@@ -22,6 +22,14 @@ func (s Set) Add(ss ...string) Set {
 	return s
 }
 
+// Remove removes a list of strings from a set
+func (s Set) Remove(ss ...string) Set {
+	for _, e := range ss {
+		delete(s, e)
+	}
+	return s
+}
+
 // Join joins two sets
 func (s Set) Join(ss Set) Set {
 	for k := range ss {

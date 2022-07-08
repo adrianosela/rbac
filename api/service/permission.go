@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/adrianosela/rbac/api/model"
+	"github.com/adrianosela/rbac/api/service/payloads"
 	"github.com/adrianosela/rbac/utils/set"
 	"github.com/gorilla/mux"
 )
@@ -19,15 +20,20 @@ func (s *service) setPermissionEndpoints() {
 
 func (s *service) createPermissionHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: get authenticated user from ctx (for ownership)
-	var permission *model.Permission
-	if err := unmarshalRequestBody(r, &permission); err != nil {
+	var pl *payloads.CreatePermissionRequest
+	if err := unmarshalRequestBody(r, &pl); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("request body is not a permission"))
 		return
 	}
-	// TODO: add authenticated user to owners if not present
-	user := "MOCK_AUTHENTICATED_USER"
-	permission.Owners = set.NewSet(permission.Owners...).Add(user).Slice()
+
+	// TODO: validate payload (e.g. for required fields, length limits, etc)
+
+	permission := &model.Permission{
+		Name:        pl.Name,
+		Description: pl.Description,
+		Owners:      set.NewSet(pl.Owners...).Add(MOCK_AUTHENTICATED_USER).Slice(),
+	}
 	// TODO: validate role has mandatory fields populated
 	if err := s.store.CreatePermission(permission); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

@@ -8,21 +8,21 @@ import (
 type Storage interface {
 	CreatePermission(*model.Permission) error
 	ReadPermission(string) (*model.Permission, error)
+	BulkReadPermissions([]string) ([]*model.Permission, error)
 	UpdatePermission(*model.Permission) error
 	DeletePermission(string) error
 
 	CreateRole(*model.Role) error
 	ReadRole(string) (*model.Role, error)
+	BulkReadRoles([]string) ([]*model.Role, error)
 	UpdateRole(*model.Role) error
 	DeleteRole(string) error
 
-	CreateUser(*model.User) error
 	ReadUser(string) (*model.User, error)
-	UpdateUser(*model.User) error
-	DeleteUser(string) error
+	AddRoleToUsers(string, []string) error
+	RemoveRoleFromUsers(string, []string) error
 
-	CreateGroup(*model.Group) error
-	ReadGroup(string) (*model.Group, error)
-	UpdateGroup(*model.Group) error
-	DeleteGroup(string) error
+	ReadGroups([]string) ([]*model.Group, error)
+	AddRoleToGroups(string, []string) error
+	RemoveRoleFromGroups(string, []string) error
 }

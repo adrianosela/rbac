@@ -1,7 +1,6 @@
-package model
+package payloads
 
-// Permission represents a permission
-type Permission struct {
+type CreatePermissionRequest struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Owners      []string `json:"owners,omitempty"`

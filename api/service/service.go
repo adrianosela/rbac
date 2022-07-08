@@ -8,24 +8,29 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var (
+	MOCK_AUTHENTICATED_USER = "adriano" // FIXME
+)
+
+// Config represents configuration for the service
+type Config struct {
+	OktaOrgDomain string
+	OktaAPIToken  string
+}
+
 type service struct {
 	router *mux.Router
 	store  storage.Storage
 	groups groups.Source
 }
 
-var mockGroupMemberships = map[string][]string{
-	"adriano@adrianosela.com": {"SIRT", "IT", "Engineering", "TeamAvocados"},
-}
-
 // New returns the handler for a new service
-func New() (http.Handler, error) {
-	rtr := mux.NewRouter()
+func New(c Config) (http.Handler, error) {
 
 	svc := &service{
-		router: rtr,
-		store:  storage.NewMemoryStorage(),                   // FIXME: use remote storage
-		groups: groups.NewMemorySource(mockGroupMemberships), // FIXME: use remote groups source
+		router: mux.NewRouter(),
+		store:  storage.NewMemoryStorage(), // FIXME: use remote storage
+		groups: groups.NewOktaSource(c.OktaOrgDomain, c.OktaAPIToken),
 	}
 
 	svc.setDebugEndpoints()
