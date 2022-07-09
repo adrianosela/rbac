@@ -9,18 +9,7 @@ type CreateRoleRequest struct {
 	Owners      []string `json:"owners,omitempty"`
 }
 
-type UpdateRoleRequest struct {
-	Description string `json:"description"`
-}
-
-type AddToRoleRequest struct {
-	Permissions []string `json:"permissions,omitempty"`
-	Users       []string `json:"users,omitempty"`
-	Groups      []string `json:"groups,omitempty"`
-	Owners      []string `json:"owners,omitempty"`
-}
-
-type RemoveFromRoleRequest struct {
+type ModifyRoleRequest struct {
 	Permissions []string `json:"permissions,omitempty"`
 	Users       []string `json:"users,omitempty"`
 	Groups      []string `json:"groups,omitempty"`

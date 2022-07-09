@@ -15,6 +15,8 @@ func (s *service) setPermissionEndpoints() {
 	s.router.Methods(http.MethodPost).Path("/permission").HandlerFunc(s.createPermissionHandler)
 	s.router.Methods(http.MethodGet).Path("/permission/{name}").HandlerFunc(s.readPermissionHandler)
 	s.router.Methods(http.MethodPatch).Path("/permission/{name}").HandlerFunc(s.updatePermissionHandler)
+	s.router.Methods(http.MethodPatch).Path("/permission/{name}/add").HandlerFunc(s.addToPermissionHandler)         // add owners
+	s.router.Methods(http.MethodPatch).Path("/permission/{name}/remove").HandlerFunc(s.removeFromPermissionHandler) // rm owners
 	s.router.Methods(http.MethodDelete).Path("/permission/{name}").HandlerFunc(s.deletePermissionHandler)
 }
 
@@ -78,9 +80,197 @@ func (s *service) readPermissionHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *service) updatePermissionHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO
+	name := mux.Vars(r)["name"]
+	if name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("no permission name in request URL"))
+		return
+	}
+
+	var pl *payloads.GenericUpdateDescriptionRequest
+	if err := unmarshalRequestBody(r, &pl); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("could not decode request body onto an GenericUpdateDescriptionRequest")) // FIXME: don't expose internals
+		return
+	}
+
+	// TODO: validate payload (e.g. for required fields, length limits, etc)
+
+	perm, err := s.store.ReadPermission(name)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to read permission from storage"))
+		return
+	}
+	if perm == nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(fmt.Sprintf("Permission \"%s\" does not exist!", name)))
+		return
+	}
+
+	if !set.NewSet(perm.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(fmt.Sprintf("Only the owners of a permission can modify the permission. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, perm.Owners)))
+		return
+	}
+
+	perm.Description = pl.Description
+	if err := s.store.UpdatePermission(perm); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to update permission in storage"))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf("Permission \"%s\" updated successfully!", name)))
+	return
+}
+
+func (s *service) addToPermissionHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: get authenticated user from ctx
+
+	name := mux.Vars(r)["name"]
+	if name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("no permission name in request URL"))
+		return
+	}
+
+	var pl *payloads.ModifyPermissionRequest
+	if err := unmarshalRequestBody(r, &pl); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("could not decode request body onto an ModifyPermissionRequest")) // FIXME: don't expose internals
+		return
+	}
+
+	// TODO: validate payload (e.g. for required fields, length limits, etc)
+
+	perm, err := s.store.ReadPermission(name)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to read permission from storage"))
+		return
+	}
+	if perm == nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(fmt.Sprintf("Permission \"%s\" does not exist!", name)))
+		return
+	}
+
+	permOwners := set.NewSet(perm.Owners...)
+	if !permOwners.Has(MOCK_AUTHENTICATED_USER) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(fmt.Sprintf("Only the owners of a permission can modify the permission. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, perm.Owners)))
+		return
+	}
+
+	perm.Owners = permOwners.Add(pl.Owners...).Slice()
+	if err := s.store.UpdatePermission(perm); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to update permission in storage"))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf("Permission \"%s\" updated successfully!", name)))
+	return
+}
+
+func (s *service) removeFromPermissionHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: get authenticated user from ctx
+
+	name := mux.Vars(r)["name"]
+	if name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("no permission name in request URL"))
+		return
+	}
+
+	var pl *payloads.ModifyPermissionRequest
+	if err := unmarshalRequestBody(r, &pl); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("could not decode request body onto an ModifyPermissionRequest")) // FIXME: don't expose internals
+		return
+	}
+
+	// TODO: validate payload (e.g. for required fields, length limits, etc)
+
+	if set.NewSet(pl.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Removing yourself as an owner is not allowed"))
+		return
+	}
+
+	perm, err := s.store.ReadPermission(name)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to read permission from storage"))
+		return
+	}
+	if perm == nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(fmt.Sprintf("Permission \"%s\" does not exist!", name)))
+		return
+	}
+
+	permOwners := set.NewSet(perm.Owners...)
+	if !permOwners.Has(MOCK_AUTHENTICATED_USER) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(fmt.Sprintf("Only the owners of a permission can modify the permission. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, perm.Owners)))
+		return
+	}
+
+	perm.Owners = permOwners.Remove(pl.Owners...).Slice()
+	if err := s.store.UpdatePermission(perm); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to update permission in storage"))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf("Permission \"%s\" updated successfully!", name)))
+	return
 }
 
 func (s *service) deletePermissionHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO
+	name := mux.Vars(r)["name"]
+	if name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("no permission name in request URL"))
+		return
+	}
+
+	perm, err := s.store.ReadPermission(name)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to read permission from storage"))
+		return
+	}
+	if perm == nil { // (not in store already)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(fmt.Sprintf("Permission \"%s\" deleted successfully!", name)))
+		return
+	}
+
+	if !set.NewSet(perm.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(fmt.Sprintf("only the owners of a permission can delete the permission. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, perm.Owners)))
+		return
+	}
+
+	if len(perm.Roles) > 0 {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(fmt.Sprintf("Permission \"%s\" is in use. Must first remove it from roles %v ", perm.Name, perm.Roles)))
+		return
+	}
+
+	if err := s.store.DeletePermission(name); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to delete permission from storage"))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf("Permission \"%s\" deleted successfully!", name)))
+	return
 }

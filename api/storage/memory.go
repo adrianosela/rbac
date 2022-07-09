@@ -56,6 +56,26 @@ func (ms *MemoryStorage) BulkReadPermissions(names []string) ([]*model.Permissio
 	return perms, nil
 }
 
+// AddRoleToPermissions adds a role to the list of roles for permissions in storage.
+func (ms *MemoryStorage) AddRoleToPermissions(role string, perms []string) error {
+	for _, perm := range perms {
+		if p, ok := ms.permissions[perm]; ok {
+			p.Roles = set.NewSet(p.Roles...).Add(role).Slice()
+		}
+	}
+	return nil
+}
+
+// RemoveRoleFromPermissions removes a role from the list of roles for permissions in storage.
+func (ms *MemoryStorage) RemoveRoleFromPermissions(role string, perms []string) error {
+	for _, perm := range perms {
+		if p, ok := ms.permissions[perm]; ok {
+			p.Roles = set.NewSet(p.Roles...).Remove(role).Slice()
+		}
+	}
+	return nil
+}
+
 // UpdatePermission updates a permission in storage
 func (ms *MemoryStorage) UpdatePermission(p *model.Permission) error {
 	if _, ok := ms.permissions[p.Name]; !ok {

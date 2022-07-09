@@ -65,12 +65,17 @@ func (s *service) createRoleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// FIXME: move three below to eventual consistence model
+	if err := s.store.AddRoleToPermissions(pl.Name, pl.Permissions); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to add role to permissions in storage"))
+		return
+	}
 	if err := s.store.AddRoleToUsers(pl.Name, pl.Users); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to add role to users in storage"))
 		return
 	}
-
 	if err := s.store.AddRoleToGroups(pl.Name, pl.Groups); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to add role to groups in storage"))
@@ -124,7 +129,7 @@ func (s *service) updateRoleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var pl *payloads.UpdateRoleRequest
+	var pl *payloads.GenericUpdateDescriptionRequest
 	if err := unmarshalRequestBody(r, &pl); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("could not decode request body onto an UpdateRoleRequest")) // FIXME: don't expose internals
@@ -173,10 +178,10 @@ func (s *service) addToRoleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var pl *payloads.AddToRoleRequest
+	var pl *payloads.ModifyRoleRequest
 	if err := unmarshalRequestBody(r, &pl); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("could not decode request body onto an AddToRoleRequest")) // FIXME: don't expose internals
+		w.Write([]byte("could not decode request body onto an ModifyRoleRequest")) // FIXME: don't expose internals
 		return
 	}
 
@@ -226,12 +231,17 @@ func (s *service) addToRoleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// FIXME: move three below to eventual consistence model
+	if err := s.store.AddRoleToPermissions(name, pl.Permissions); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to add role to permissions in storage"))
+		return
+	}
 	if err := s.store.AddRoleToUsers(name, pl.Users); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to add role to users in storage"))
 		return
 	}
-
 	if err := s.store.AddRoleToGroups(name, pl.Groups); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to add role to groups in storage"))
@@ -253,10 +263,10 @@ func (s *service) removeFromRoleHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var pl *payloads.RemoveFromRoleRequest
+	var pl *payloads.ModifyRoleRequest
 	if err := unmarshalRequestBody(r, &pl); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("could not decode request body onto an RemoveFromRoleRequest")) // FIXME: don't expose internals
+		w.Write([]byte("could not decode request body onto an ModifyRoleRequest")) // FIXME: don't expose internals
 		return
 	}
 
@@ -264,7 +274,7 @@ func (s *service) removeFromRoleHandler(w http.ResponseWriter, r *http.Request) 
 
 	if set.NewSet(pl.Owners...).Has(MOCK_AUTHENTICATED_USER) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Removing self from owners is not allowed"))
+		w.Write([]byte("Removing yourself as an owner is not allowed"))
 		return
 	}
 
@@ -281,7 +291,6 @@ func (s *service) removeFromRoleHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	owners := set.NewSet(role.Owners...)
-
 	if !owners.Has(MOCK_AUTHENTICATED_USER) {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(fmt.Sprintf("Only the owners of a role can modify the role. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, role.Owners)))
@@ -299,12 +308,17 @@ func (s *service) removeFromRoleHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// FIXME: move three below to eventual consistence model
+	if err := s.store.RemoveRoleFromPermissions(name, pl.Permissions); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to remove role from permissions in storage"))
+		return
+	}
 	if err := s.store.RemoveRoleFromUsers(name, pl.Users); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to remove role from users in storage"))
 		return
 	}
-
 	if err := s.store.RemoveRoleFromGroups(name, pl.Groups); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to remove role from groups in storage"))
@@ -343,13 +357,18 @@ func (s *service) deleteRoleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.store.RemoveRoleFromUsers(role.Name, role.Users); err != nil {
+	// FIXME: move three below to eventual consistence model
+	if err := s.store.RemoveRoleFromPermissions(name, role.Permissions); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to remove role from permissions in storage"))
+		return
+	}
+	if err := s.store.RemoveRoleFromUsers(name, role.Users); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to remove role from users in storage"))
 		return
 	}
-
-	if err := s.store.RemoveRoleFromGroups(role.Name, role.Groups); err != nil {
+	if err := s.store.RemoveRoleFromGroups(name, role.Groups); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to remove role from groups in storage"))
 		return

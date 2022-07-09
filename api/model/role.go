@@ -4,8 +4,8 @@ package model
 type Role struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
-	Permissions []string `json:"permissions"`
+	Owners      []string `json:"owners"`
 	Users       []string `json:"users"`
 	Groups      []string `json:"groups"`
-	Owners      []string `json:"owners"`
+	Permissions []string `json:"permissions"`
 }

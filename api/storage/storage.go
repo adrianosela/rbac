@@ -11,6 +11,8 @@ type Storage interface {
 	BulkReadPermissions([]string) ([]*model.Permission, error)
 	UpdatePermission(*model.Permission) error
 	DeletePermission(string) error
+	AddRoleToPermissions(string, []string) error      // FIXME: move to eventual consistence
+	RemoveRoleFromPermissions(string, []string) error // FIXME: move to eventual consistence
 
 	CreateRole(*model.Role) error
 	ReadRole(string) (*model.Role, error)
@@ -19,10 +21,10 @@ type Storage interface {
 	DeleteRole(string) error
 
 	ReadUser(string) (*model.User, error)
-	AddRoleToUsers(string, []string) error
-	RemoveRoleFromUsers(string, []string) error
+	AddRoleToUsers(string, []string) error      // FIXME: move to eventual consistence
+	RemoveRoleFromUsers(string, []string) error // FIXME: move to eventual consistence
 
 	ReadGroups([]string) ([]*model.Group, error)
-	AddRoleToGroups(string, []string) error
-	RemoveRoleFromGroups(string, []string) error
+	AddRoleToGroups(string, []string) error      // FIXME: move to eventual consistence
+	RemoveRoleFromGroups(string, []string) error // FIXME: move to eventual consistence
 }
