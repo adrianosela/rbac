@@ -12,19 +12,19 @@ import (
 )
 
 func (s *service) setRoleEndpoints() {
-	s.router.Methods(http.MethodPost).Path("/role").HandlerFunc(s.createRoleHandler)
+	s.router.Methods(http.MethodPost).Path("/role").Handler(s.auth(s.createRoleHandler))
 
 	s.router.Methods(http.MethodGet).Path("/role/{name}").HandlerFunc(s.readRoleHandler)
 
-	s.router.Methods(http.MethodPatch).Path("/role/{name}").HandlerFunc(s.updateRoleHandler)            // modify description
-	s.router.Methods(http.MethodPatch).Path("/role/{name}/add").HandlerFunc(s.addToRoleHandler)         // add permissions, assumers, or owners
-	s.router.Methods(http.MethodPatch).Path("/role/{name}/remove").HandlerFunc(s.removeFromRoleHandler) // rm permissions, assumers, or owners
+	s.router.Methods(http.MethodPatch).Path("/role/{name}").Handler(s.auth(s.updateRoleHandler))            // modify description
+	s.router.Methods(http.MethodPatch).Path("/role/{name}/add").Handler(s.auth(s.addToRoleHandler))         // add permissions, assumers, or owners
+	s.router.Methods(http.MethodPatch).Path("/role/{name}/remove").Handler(s.auth(s.removeFromRoleHandler)) // rm permissions, assumers, or owners
 
-	s.router.Methods(http.MethodDelete).Path("/role/{name}").HandlerFunc(s.deleteRoleHandler)
+	s.router.Methods(http.MethodDelete).Path("/role/{name}").Handler(s.auth(s.deleteRoleHandler))
 }
 
 func (s *service) createRoleHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: get authenticated user from ctx
+	authenticatedUser := getAuthenticatedUser(r)
 
 	var pl *payloads.CreateRoleRequest
 	if err := unmarshalRequestBody(r, &pl); err != nil {
@@ -41,7 +41,7 @@ func (s *service) createRoleHandler(w http.ResponseWriter, r *http.Request) {
 		Permissions: set.NewSet(pl.Permissions...).Slice(),
 		Users:       set.NewSet(pl.Users...).Slice(),
 		Groups:      set.NewSet(pl.Groups...).Slice(),
-		Owners:      set.NewSet(pl.Owners...).Add(MOCK_AUTHENTICATED_USER).Slice(),
+		Owners:      set.NewSet(pl.Owners...).Add(authenticatedUser).Slice(),
 	}
 
 	perms, err := s.store.BulkReadPermissions(pl.Permissions)
@@ -52,9 +52,9 @@ func (s *service) createRoleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, perm := range perms {
-		if !set.NewSet(perm.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+		if !set.NewSet(perm.Owners...).Has(authenticatedUser) {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(fmt.Sprintf("Only the owners of a permission can add it to a role. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, perm.Owners)))
+			w.Write([]byte(fmt.Sprintf("Only the owners of a permission can add it to a role. User \"%s\" not in %v.", authenticatedUser, perm.Owners)))
 			return
 		}
 	}
@@ -120,7 +120,7 @@ func (s *service) readRoleHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *service) updateRoleHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: get authenticated user from ctx
+	authenticatedUser := getAuthenticatedUser(r)
 
 	name := mux.Vars(r)["name"]
 	if name == "" {
@@ -150,9 +150,9 @@ func (s *service) updateRoleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !set.NewSet(role.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+	if !set.NewSet(role.Owners...).Has(authenticatedUser) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(fmt.Sprintf("Only the owners of a role can modify the role. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, role.Owners)))
+		w.Write([]byte(fmt.Sprintf("Only the owners of a role can modify the role. User \"%s\" not in %v.", authenticatedUser, role.Owners)))
 		return
 	}
 
@@ -169,7 +169,7 @@ func (s *service) updateRoleHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *service) addToRoleHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: get authenticated user from ctx
+	authenticatedUser := getAuthenticatedUser(r)
 
 	name := mux.Vars(r)["name"]
 	if name == "" {
@@ -200,9 +200,9 @@ func (s *service) addToRoleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	roleOwners := set.NewSet(role.Owners...)
-	if !roleOwners.Has(MOCK_AUTHENTICATED_USER) {
+	if !roleOwners.Has(authenticatedUser) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(fmt.Sprintf("Only the owners of a role can modify the role. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, role.Owners)))
+		w.Write([]byte(fmt.Sprintf("Only the owners of a role can modify the role. User \"%s\" not in %v.", authenticatedUser, role.Owners)))
 		return
 	}
 
@@ -213,9 +213,9 @@ func (s *service) addToRoleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, perm := range perms {
-		if !set.NewSet(perm.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+		if !set.NewSet(perm.Owners...).Has(authenticatedUser) {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(fmt.Sprintf("Only the owners of a permission can add it to a role. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, perm.Owners)))
+			w.Write([]byte(fmt.Sprintf("Only the owners of a permission can add it to a role. User \"%s\" not in %v.", authenticatedUser, perm.Owners)))
 			return
 		}
 	}
@@ -254,7 +254,7 @@ func (s *service) addToRoleHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *service) removeFromRoleHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: get authenticated user from ctx
+	authenticatedUser := getAuthenticatedUser(r)
 
 	name := mux.Vars(r)["name"]
 	if name == "" {
@@ -272,7 +272,7 @@ func (s *service) removeFromRoleHandler(w http.ResponseWriter, r *http.Request) 
 
 	// TODO: validate payload (e.g. for required fields, length limits, etc)
 
-	if set.NewSet(pl.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+	if set.NewSet(pl.Owners...).Has(authenticatedUser) {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Removing yourself as an owner is not allowed"))
 		return
@@ -291,9 +291,9 @@ func (s *service) removeFromRoleHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	owners := set.NewSet(role.Owners...)
-	if !owners.Has(MOCK_AUTHENTICATED_USER) {
+	if !owners.Has(authenticatedUser) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(fmt.Sprintf("Only the owners of a role can modify the role. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, role.Owners)))
+		w.Write([]byte(fmt.Sprintf("Only the owners of a role can modify the role. User \"%s\" not in %v.", authenticatedUser, role.Owners)))
 		return
 	}
 
@@ -331,6 +331,8 @@ func (s *service) removeFromRoleHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *service) deleteRoleHandler(w http.ResponseWriter, r *http.Request) {
+	authenticatedUser := getAuthenticatedUser(r)
+
 	name := mux.Vars(r)["name"]
 	if name == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -351,9 +353,9 @@ func (s *service) deleteRoleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !set.NewSet(role.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+	if !set.NewSet(role.Owners...).Has(authenticatedUser) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(fmt.Sprintf("only the owners of a role can delete the role. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, role.Owners)))
+		w.Write([]byte(fmt.Sprintf("only the owners of a role can delete the role. User \"%s\" not in %v.", authenticatedUser, role.Owners)))
 		return
 	}
 

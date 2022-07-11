@@ -12,16 +12,17 @@ import (
 )
 
 func (s *service) setPermissionEndpoints() {
-	s.router.Methods(http.MethodPost).Path("/permission").HandlerFunc(s.createPermissionHandler)
+	s.router.Methods(http.MethodPost).Path("/permission").Handler(s.auth(s.createPermissionHandler))
 	s.router.Methods(http.MethodGet).Path("/permission/{name}").HandlerFunc(s.readPermissionHandler)
-	s.router.Methods(http.MethodPatch).Path("/permission/{name}").HandlerFunc(s.updatePermissionHandler)
-	s.router.Methods(http.MethodPatch).Path("/permission/{name}/add").HandlerFunc(s.addToPermissionHandler)         // add owners
-	s.router.Methods(http.MethodPatch).Path("/permission/{name}/remove").HandlerFunc(s.removeFromPermissionHandler) // rm owners
-	s.router.Methods(http.MethodDelete).Path("/permission/{name}").HandlerFunc(s.deletePermissionHandler)
+	s.router.Methods(http.MethodPatch).Path("/permission/{name}").Handler(s.auth(s.updatePermissionHandler))
+	s.router.Methods(http.MethodPatch).Path("/permission/{name}/add").Handler(s.auth(s.addToPermissionHandler))         // add owners
+	s.router.Methods(http.MethodPatch).Path("/permission/{name}/remove").Handler(s.auth(s.removeFromPermissionHandler)) // rm owners
+	s.router.Methods(http.MethodDelete).Path("/permission/{name}").Handler(s.auth(s.deletePermissionHandler))
 }
 
 func (s *service) createPermissionHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: get authenticated user from ctx (for ownership)
+	authenticatedUser := getAuthenticatedUser(r)
+
 	var pl *payloads.CreatePermissionRequest
 	if err := unmarshalRequestBody(r, &pl); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -34,7 +35,7 @@ func (s *service) createPermissionHandler(w http.ResponseWriter, r *http.Request
 	permission := &model.Permission{
 		Name:        pl.Name,
 		Description: pl.Description,
-		Owners:      set.NewSet(pl.Owners...).Add(MOCK_AUTHENTICATED_USER).Slice(),
+		Owners:      set.NewSet(pl.Owners...).Add(authenticatedUser).Slice(),
 	}
 	// TODO: validate role has mandatory fields populated
 	if err := s.store.CreatePermission(permission); err != nil {
@@ -80,6 +81,8 @@ func (s *service) readPermissionHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *service) updatePermissionHandler(w http.ResponseWriter, r *http.Request) {
+	authenticatedUser := getAuthenticatedUser(r)
+
 	name := mux.Vars(r)["name"]
 	if name == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -108,9 +111,9 @@ func (s *service) updatePermissionHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if !set.NewSet(perm.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+	if !set.NewSet(perm.Owners...).Has(authenticatedUser) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(fmt.Sprintf("Only the owners of a permission can modify the permission. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, perm.Owners)))
+		w.Write([]byte(fmt.Sprintf("Only the owners of a permission can modify the permission. User \"%s\" not in %v.", authenticatedUser, perm.Owners)))
 		return
 	}
 
@@ -127,7 +130,7 @@ func (s *service) updatePermissionHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (s *service) addToPermissionHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: get authenticated user from ctx
+	authenticatedUser := getAuthenticatedUser(r)
 
 	name := mux.Vars(r)["name"]
 	if name == "" {
@@ -158,9 +161,9 @@ func (s *service) addToPermissionHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	permOwners := set.NewSet(perm.Owners...)
-	if !permOwners.Has(MOCK_AUTHENTICATED_USER) {
+	if !permOwners.Has(authenticatedUser) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(fmt.Sprintf("Only the owners of a permission can modify the permission. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, perm.Owners)))
+		w.Write([]byte(fmt.Sprintf("Only the owners of a permission can modify the permission. User \"%s\" not in %v.", authenticatedUser, perm.Owners)))
 		return
 	}
 
@@ -177,7 +180,7 @@ func (s *service) addToPermissionHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *service) removeFromPermissionHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: get authenticated user from ctx
+	authenticatedUser := getAuthenticatedUser(r)
 
 	name := mux.Vars(r)["name"]
 	if name == "" {
@@ -195,7 +198,7 @@ func (s *service) removeFromPermissionHandler(w http.ResponseWriter, r *http.Req
 
 	// TODO: validate payload (e.g. for required fields, length limits, etc)
 
-	if set.NewSet(pl.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+	if set.NewSet(pl.Owners...).Has(authenticatedUser) {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Removing yourself as an owner is not allowed"))
 		return
@@ -214,9 +217,9 @@ func (s *service) removeFromPermissionHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	permOwners := set.NewSet(perm.Owners...)
-	if !permOwners.Has(MOCK_AUTHENTICATED_USER) {
+	if !permOwners.Has(authenticatedUser) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(fmt.Sprintf("Only the owners of a permission can modify the permission. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, perm.Owners)))
+		w.Write([]byte(fmt.Sprintf("Only the owners of a permission can modify the permission. User \"%s\" not in %v.", authenticatedUser, perm.Owners)))
 		return
 	}
 
@@ -233,6 +236,8 @@ func (s *service) removeFromPermissionHandler(w http.ResponseWriter, r *http.Req
 }
 
 func (s *service) deletePermissionHandler(w http.ResponseWriter, r *http.Request) {
+	authenticatedUser := getAuthenticatedUser(r)
+
 	name := mux.Vars(r)["name"]
 	if name == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -252,9 +257,9 @@ func (s *service) deletePermissionHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if !set.NewSet(perm.Owners...).Has(MOCK_AUTHENTICATED_USER) {
+	if !set.NewSet(perm.Owners...).Has(authenticatedUser) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(fmt.Sprintf("only the owners of a permission can delete the permission. User \"%s\" not in %v.", MOCK_AUTHENTICATED_USER, perm.Owners)))
+		w.Write([]byte(fmt.Sprintf("only the owners of a permission can delete the permission. User \"%s\" not in %v.", authenticatedUser, perm.Owners)))
 		return
 	}
 
